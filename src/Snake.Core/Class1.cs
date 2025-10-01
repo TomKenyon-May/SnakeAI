@@ -2,5 +2,77 @@
 
 public class Class1
 {
+    public Point Apple = new Point(10, 10);
 
+    public List<Point> Snake = new List<Point>()
+    {
+        new Point(5, 5),
+        new Point(5, 6),
+    };
+
+    public Direction SnakeDirection = Direction.Right;
+
+    public bool SnakeDead = false;
+
+    public void MoveApple()
+    {
+        do
+        {
+            Apple.X = Random.Shared.Next(0, 20);
+            Apple.Y = Random.Shared.Next(0, 20);
+        } while (Snake.Contains(Apple));
+    }
+
+    public void MoveSnake()
+    {
+        Point snakeHead = Snake.Last();
+        Point newSnakeHead = snakeHead;
+
+        switch (SnakeDirection)
+        {
+            case Direction.Up:
+                newSnakeHead = new Point(snakeHead.X, snakeHead.Y - 1);
+                break;
+            case Direction.Down:
+                newSnakeHead = new Point(snakeHead.X, snakeHead.Y + 1);
+                break;
+            case Direction.Left:
+                newSnakeHead = new Point(snakeHead.X - 1, snakeHead.Y);
+                break;
+            case Direction.Right:
+                newSnakeHead = new Point(snakeHead.X + 1, snakeHead.Y);
+                break;
+            default:
+                SnakeDead = true;
+                break;
+        }
+
+        if (newSnakeHead == Apple)
+        {
+            Snake.Add(newSnakeHead);
+            MoveApple();
+        }
+        else
+        {
+            Snake.RemoveAt(0);
+            Snake.Add(newSnakeHead);
+        }
+    }
+
+    public void CollisionCheck(Point head)
+    {
+        // check wall collision
+        if (head.X < 0 || head.X > 19 || head.Y < 0 || head.Y > 19)
+        {
+            SnakeDead = true;
+            return;
+        }
+
+        // check self collision
+        if (Snake.Contains(head))
+        {
+            SnakeDead = true;
+            return;
+        }
+    }
 }
