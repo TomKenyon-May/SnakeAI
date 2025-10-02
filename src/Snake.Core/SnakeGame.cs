@@ -1,6 +1,6 @@
 ﻿namespace Snake.Core;
 
-public class Class1
+public class SnakeGame
 {
     public Point Apple = new Point(10, 10);
 
@@ -46,6 +46,8 @@ public class Class1
                 SnakeDead = true;
                 break;
         }
+
+        CollisionCheck(newSnakeHead);
 
         if (newSnakeHead == Apple)
         {
