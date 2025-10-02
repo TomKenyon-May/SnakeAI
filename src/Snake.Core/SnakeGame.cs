@@ -49,7 +49,7 @@ public class SnakeGame
 
         CollisionCheck(newSnakeHead);
 
-        if (newSnakeHead == Apple)
+        if (newSnakeHead.X == Apple.X && newSnakeHead.Y == Apple.Y)
         {
             Snake.Add(newSnakeHead);
             MoveApple();
