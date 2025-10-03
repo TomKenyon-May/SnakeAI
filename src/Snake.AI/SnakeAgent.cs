@@ -5,7 +5,8 @@ namespace SnakeAI;
 public sealed class SnakeAgent
 {
     public SnakeGame Game { get; private set; } = new SnakeGame();
-    public readonly int StateDim = 406;
+    private float gridCellSize = 20f;
+    public readonly int StateDim = 406; // 400 for grid + 2 for apple pos + 4 for direction
     public int ActionCount => 3;
     private int StepCount = 0;
 
@@ -20,34 +21,36 @@ public sealed class SnakeAgent
     {
         var state = new float[StateDim];
 
-        for (int y = 0; y < 20; y++)
+        for (int y = 0; y < (int)gridCellSize; y++)
         {
-            for (int x = 0; x < 20; x++)
+            for (int x = 0; x < (int)gridCellSize; x++)
             {
-                state[y * 20 + x] = 0f;
+                state[y * (int)gridCellSize + x] = 0f;
             }
         }
 
         foreach (var segment in Game.Snake)
         {
-            state[segment.Y * 20 + segment.X] = 1f;
+            state[segment.Y * (int)gridCellSize + segment.X] = 1f;
         }
 
-        state[400] = Game.Apple.X / 19f;
-        state[401] = Game.Apple.Y / 19f;
+        // Normalize apple position to [0, 1]
+        state[400] = Game.Apple.X / (gridCellSize - 1);
+        state[401] = Game.Apple.Y / (gridCellSize - 1);
 
+        // Direction one-hot encoding [Up, Right, Down, Left]
         switch (Game.SnakeDirection)
         {
             case Direction.Up:
                 state[402] = 1f;
                 break;
-            case Direction.Down:
+            case Direction.Right:
                 state[403] = 1f;
                 break;
-            case Direction.Left:
+            case Direction.Down:
                 state[404] = 1f;
                 break;
-            case Direction.Right:
+            case Direction.Left:
                 state[405] = 1f;
                 break;
         }
@@ -57,15 +60,17 @@ public sealed class SnakeAgent
 
     private void ApplyAction(int action)
     {
+        // Action: 0 = turn left, 1 = straight, 2 = turn right
         switch (action)
         {
             case 0:
                 Game.SnakeDirection = (Direction)(((int)Game.SnakeDirection + 3) % 4);
                 break;
             case 1:
-                Game.SnakeDirection = (Direction)(((int)Game.SnakeDirection + 1) % 4);
                 break;
             case 2:
+                Game.SnakeDirection = (Direction)(((int)Game.SnakeDirection + 1) % 4);
+                break;
             default:
                 break;
         }
@@ -102,7 +107,7 @@ public sealed class SnakeAgent
 
         var nextState = EncodeState();
         var reward = CalculateReward(lenBefore, distBefore);
-        var done = Game.SnakeDead || StepCount > (200 + Game.Snake.Count * 5);
+        var done = Game.SnakeDead || StepCount > (200 + Game.Snake.Count * 5); // Prevent stalling
         return (nextState, reward, done);
     }
 }
