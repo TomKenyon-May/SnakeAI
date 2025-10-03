@@ -75,14 +75,7 @@ public sealed class Mlp
         if (state.Length != InputSize)
             throw new ArgumentException($"Expected state length {InputSize}, got {state.Length}");
 
-        var a1 = new float[Hidden1];
-        var a2 = new float[Hidden2];
-        var q = new float[OutputSize];
-
-        Relu(Weight1, Hidden1, InputSize, state, Bias1, a1);
-        Relu(Weight2, Hidden2, Hidden1, a1, Bias2, a2);
-        Linear(Weight3, OutputSize, Hidden2, a2, Bias3, q);
-
+        Forward(state, out var a1, out var a2, out var q);
         return q;
     }
 
