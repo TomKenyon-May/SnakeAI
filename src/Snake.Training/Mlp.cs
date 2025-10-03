@@ -195,7 +195,69 @@ public sealed class Mlp
 
     public void BackwardAndStepBatch(Batch batch, float[] targets, float lr)
     {
-        // Placeholder for batch backward pass and weight update logic
+        var dW3 = new float[Weight3.Length]; var dB3 = new float[Bias3.Length];
+        var dW2 = new float[Weight2.Length]; var dB2 = new float[Bias2.Length];
+        var dW1 = new float[Weight1.Length]; var dB1 = new float[Bias1.Length];
+
+        int B = batch.Actions.Length;
+
+        for (int n = 0; n < B; n++)
+        {
+            var x   = batch.States[n];
+            int a   = batch.Actions[n];
+            float t = targets[n];
+
+            Forward(x, out var a1, out var a2, out var q);
+
+            var dQ = new float[OutputSize];
+            dQ[a] = q[a] - t;
+
+            var dA2 = new float[Hidden2];
+            for (int r = 0; r < OutputSize; r++)
+            {
+                float g = dQ[r];
+                dB3[r] += g;
+                int off = r * Hidden2;
+                for (int c = 0; c < Hidden2; c++)
+                {
+                    dW3[off + c] += g * a2[c];
+                    dA2[c]       += g * Weight3[off + c];
+                }
+            }
+            for (int i = 0; i < Hidden2; i++) if (a2[i] <= 0f) dA2[i] = 0f;
+
+            var dA1 = new float[Hidden1];
+            for (int r = 0; r < Hidden2; r++)
+            {
+                float g = dA2[r];
+                dB2[r] += g;
+                int off = r * Hidden1;
+                for (int c = 0; c < Hidden1; c++)
+                {
+                    dW2[off + c] += g * a1[c];
+                    dA1[c]       += g * Weight2[off + c];
+                }
+            }
+            for (int i = 0; i < Hidden1; i++) if (a1[i] <= 0f) dA1[i] = 0f;
+
+            for (int r = 0; r < Hidden1; r++)
+            {
+                float g = dA1[r];
+                dB1[r] += g;
+                int off = r * InputSize;
+                for (int c = 0; c < InputSize; c++)
+                    dW1[off + c] += g * x[c];
+            }
+        }
+
+        for (int i = 0; i < Weight3.Length; i++) Weight3[i] -= lr * dW3[i];
+        for (int i = 0; i < Bias3.Length;   i++) Bias3[i]   -= lr * dB3[i];
+
+        for (int i = 0; i < Weight2.Length; i++) Weight2[i] -= lr * dW2[i];
+        for (int i = 0; i < Bias2.Length;   i++) Bias2[i]   -= lr * dB2[i];
+
+        for (int i = 0; i < Weight1.Length; i++) Weight1[i] -= lr * dW1[i];
+        for (int i = 0; i < Bias1.Length;   i++) Bias1[i]   -= lr * dB1[i];
     }
 
     public void Save(string path)
