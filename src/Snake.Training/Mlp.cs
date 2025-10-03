@@ -7,6 +7,8 @@ public sealed class Mlp
     private readonly float[] Weight1, Weight2, Weight3;
     private readonly float[] Bias1, Bias2, Bias3;
     private readonly Random rng;
+    private const int FileMagic = 0x4D4C5031; // 'MLP1'
+    private const int Version = 1;
 
     public Mlp(int inputSize, int hidden1, int hidden2, int outputSize)
     {
@@ -181,7 +183,7 @@ public sealed class Mlp
 
         for (int i = 0; i < Weight1.Length; i++)
             Weight1[i] -= learningRate * dW1[i];
-            
+
         for (int i = 0; i < Bias1.Length; i++)
             Bias1[i] -= learningRate * dB1[i];
     }
@@ -196,8 +198,8 @@ public sealed class Mlp
 
         for (int n = 0; n < B; n++)
         {
-            var x   = batch.States[n];
-            int a   = batch.Actions[n];
+            var x = batch.States[n];
+            int a = batch.Actions[n];
             float t = targets[n];
 
             Forward(x, out var a1, out var a2, out var q);
@@ -214,7 +216,7 @@ public sealed class Mlp
                 for (int c = 0; c < Hidden2; c++)
                 {
                     dW3[off + c] += g * a2[c];
-                    dA2[c]       += g * Weight3[off + c];
+                    dA2[c] += g * Weight3[off + c];
                 }
             }
             for (int i = 0; i < Hidden2; i++) if (a2[i] <= 0f) dA2[i] = 0f;
@@ -228,7 +230,7 @@ public sealed class Mlp
                 for (int c = 0; c < Hidden1; c++)
                 {
                     dW2[off + c] += g * a1[c];
-                    dA1[c]       += g * Weight2[off + c];
+                    dA1[c] += g * Weight2[off + c];
                 }
             }
             for (int i = 0; i < Hidden1; i++) if (a1[i] <= 0f) dA1[i] = 0f;
@@ -244,22 +246,72 @@ public sealed class Mlp
         }
 
         for (int i = 0; i < Weight3.Length; i++) Weight3[i] -= lr * dW3[i];
-        for (int i = 0; i < Bias3.Length;   i++) Bias3[i]   -= lr * dB3[i];
+        for (int i = 0; i < Bias3.Length; i++) Bias3[i] -= lr * dB3[i];
 
         for (int i = 0; i < Weight2.Length; i++) Weight2[i] -= lr * dW2[i];
-        for (int i = 0; i < Bias2.Length;   i++) Bias2[i]   -= lr * dB2[i];
+        for (int i = 0; i < Bias2.Length; i++) Bias2[i] -= lr * dB2[i];
 
         for (int i = 0; i < Weight1.Length; i++) Weight1[i] -= lr * dW1[i];
-        for (int i = 0; i < Bias1.Length;   i++) Bias1[i]   -= lr * dB1[i];
+        for (int i = 0; i < Bias1.Length; i++) Bias1[i] -= lr * dB1[i];
     }
 
     public void Save(string path)
     {
-        // Save model parameters to the specified path
+        using var fs = File.Create(path);
+        using var bw = new BinaryWriter(fs);
+
+        bw.Write(FileMagic);
+        bw.Write(Version);
+
+        bw.Write(InputSize);
+        bw.Write(Hidden1);
+        bw.Write(Hidden2);
+        bw.Write(OutputSize);
+
+        WriteArray(bw, Weight1);
+        WriteArray(bw, Bias1);
+        WriteArray(bw, Weight2);
+        WriteArray(bw, Bias2);
+        WriteArray(bw, Weight3);
+        WriteArray(bw, Bias3);
     }
 
     public void Load(string path)
     {
-        // Load model parameters from the specified path
+        using var fs = File.OpenRead(path);
+        using var br = new BinaryReader(fs);
+
+        int magic = br.ReadInt32();
+        if (magic != FileMagic) throw new InvalidDataException("Invalid file format.");
+
+        int version = br.ReadInt32();
+        if (version != Version) throw new InvalidDataException($"Unsupported version: {version}");
+
+        int inSize = br.ReadInt32();
+        int h1Size = br.ReadInt32();
+        int h2Size = br.ReadInt32();
+        int outSize = br.ReadInt32();
+
+        if (inSize != InputSize || h1Size != Hidden1 || h2Size != Hidden2 || outSize != OutputSize)
+            throw new InvalidDataException("Network architecture mismatch.");
+
+        ReadArray(br, Weight1);
+        ReadArray(br, Bias1);
+        ReadArray(br, Weight2);
+        ReadArray(br, Bias2);
+        ReadArray(br, Weight3);
+        ReadArray(br, Bias3);
+    }
+
+    private void WriteArray(BinaryWriter bw, float[] array)
+    {
+        foreach (var v in array)
+            bw.Write(v);
+    }
+    
+    private void ReadArray(BinaryReader br, float[] array)
+    {
+        for (int i = 0; i < array.Length; i++)
+            array[i] = br.ReadSingle();
     }
 }
