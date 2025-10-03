@@ -1,7 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using System.Threading.Tasks.Dataflow;
-
-namespace Snake.Training;
+﻿namespace Snake.Training;
 
 public sealed class Mlp
 {
@@ -49,8 +46,6 @@ public sealed class Mlp
         return minValue + (maxValue - minValue) * rng.NextDouble();
     }
 
-    private static int Index(int row, int col, int cols) => row * cols + col;
-
     private static void Linear(float[] W, int rows, int cols, float[] x, float[] b, float[] y)
     {
         for (int r = 0; r < rows; r++)
@@ -91,9 +86,116 @@ public sealed class Mlp
         return q;
     }
 
-    public void TrainStep(Batch batch, float gamma, float learningRate)
+    public void CopyWeightsFrom(Mlp other)
     {
-        // Perform a training step using the provided batch
+        if (other.InputSize != InputSize || other.Hidden1 != Hidden1 || other.Hidden2 != Hidden2 || other.OutputSize != OutputSize)
+            throw new ArgumentException("Network architecture mismatch.");
+
+        Array.Copy(other.Weight1, Weight1, Weight1.Length);
+        Array.Copy(other.Bias1, Bias1, Bias1.Length);
+        Array.Copy(other.Weight2, Weight2, Weight2.Length);
+        Array.Copy(other.Bias2, Bias2, Bias2.Length);
+        Array.Copy(other.Weight3, Weight3, Weight3.Length);
+        Array.Copy(other.Bias3, Bias3, Bias3.Length);
+    }
+
+    private void Forward(float[] x, out float[] a1, out float[] a2, out float[] q)
+    {
+        a1 = new float[Hidden1];
+        a2 = new float[Hidden2];
+        q = new float[OutputSize];
+
+        Relu(Weight1, Hidden1, InputSize, x, Bias1, a1);
+        Relu(Weight2, Hidden2, Hidden1, a1, Bias2, a2);
+        Linear(Weight3, OutputSize, Hidden2, a2, Bias3, q);
+    }
+
+    public void BackwardAndStep(float[] state, int action, float target, float learningRate)
+    {
+        Forward(state, out var a1, out var a2, out var q);
+
+        var dQ = new float[OutputSize];
+        float error = q[action] - target;
+        dQ[action] = error;
+
+        var dW3 = new float[Weight3.Length];
+        var dB3 = new float[Bias3.Length];
+        var dA2 = new float[Hidden2];
+
+        for (int r = 0; r < OutputSize; r++)
+        {
+            float g = dQ[r];
+            dB3[r] += g;
+            int off = r * Hidden2;
+            for (int c = 0; c < Hidden2; c++)
+            {
+                dW3[off + c] += g * a2[c];
+                dA2[c] += g * Weight3[off + c];
+            }
+        }
+
+        for (int i = 0; i < Hidden2; i++)
+        {
+            if (a2[i] <= 0f) dA2[i] = 0f;
+        }
+
+        var dW2 = new float[Weight2.Length];
+        var dB2 = new float[Bias2.Length];
+        var dA1 = new float[Hidden1];
+
+        for (int r = 0; r < Hidden2; r++)
+        {
+            float g = dA2[r];
+            dB2[r] += g;
+            int off = r * Hidden1;
+            for (int c = 0; c < Hidden1; c++)
+            {
+                dW2[off + c] += g * a1[c];
+                dA1[c] += g * Weight2[off + c];
+            }
+        }
+
+        for (int i = 0; i < Hidden1; i++)
+        {
+            if (a1[i] <= 0f) dA1[i] = 0f;
+        }
+
+        var dW1 = new float[Weight1.Length];
+        var dB1 = new float[Bias1.Length];
+
+        for (int r = 0; r < Hidden1; r++)
+        {
+            float g = dA1[r];
+            dB1[r] += g;
+            int off = r * InputSize;
+            for (int c = 0; c < InputSize; c++)
+            {
+                dW1[off + c] += g * state[c];
+            }
+        }
+
+        for (int i = 0; i < Weight3.Length; i++)
+            Weight3[i] -= learningRate * dW3[i];
+
+        for (int i = 0; i < Bias3.Length; i++)
+            Bias3[i] -= learningRate * dB3[i];
+
+        for (int i = 0; i < Weight2.Length; i++)
+            Weight2[i] -= learningRate * dW2[i];
+
+        for (int i = 0; i < Bias2.Length; i++)
+            Bias2[i] -= learningRate * dB2[i];
+
+        for (int i = 0; i < Weight1.Length; i++)
+            Weight1[i] -= learningRate * dW1[i];
+            
+        for (int i = 0; i < Bias1.Length; i++)
+            Bias1[i] -= learningRate * dB1[i];
+    }
+
+    public void BackwardAndStepBatch(Batch batch, float[] targets, float learningRate)
+    {
+        // Placeholder for batch backward pass and weight update logic
     }
 
     public void Save(string path)
@@ -104,14 +206,5 @@ public sealed class Mlp
     public void Load(string path)
     {
         // Load model parameters from the specified path
-    }
-
-    public sealed class Batch
-    {
-        public float[][] States { get; init; } = default!;
-        public int[] Actions { get; init; } = default!;
-        public float[] Rewards { get; init; } = default!;
-        public float[][] NextStates { get; init; } = default!;
-        public bool[] Dones { get; init; } = default!;
     }
 }
