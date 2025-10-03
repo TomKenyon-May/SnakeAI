@@ -193,7 +193,7 @@ public sealed class Mlp
             Bias1[i] -= learningRate * dB1[i];
     }
 
-    public void BackwardAndStepBatch(Batch batch, float[] targets, float learningRate)
+    public void BackwardAndStepBatch(Batch batch, float[] targets, float lr)
     {
         // Placeholder for batch backward pass and weight update logic
     }
