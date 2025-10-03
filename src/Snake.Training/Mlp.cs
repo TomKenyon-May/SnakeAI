@@ -107,152 +107,126 @@ public sealed class Mlp
 
     public void BackwardAndStep(float[] state, int action, float target, float learningRate)
     {
+        if (state == null || state.Length != InputSize)
+            throw new ArgumentException($"Expected state length {InputSize}", nameof(state));
+        if ((uint)action >= (uint)OutputSize)
+            throw new ArgumentOutOfRangeException(nameof(action));
+
         Forward(state, out var a1, out var a2, out var q);
 
-        var dQ = new float[OutputSize];
-        float error = q[action] - target;
-        dQ[action] = error;
+        // dQ only for selected action (fast path)
+        float g = q[action] - target;
 
         var dW3 = new float[Weight3.Length];
         var dB3 = new float[Bias3.Length];
         var dA2 = new float[Hidden2];
 
-        for (int r = 0; r < OutputSize; r++)
-        {
-            float g = dQ[r];
-            dB3[r] += g;
-            int off = r * Hidden2;
-            for (int c = 0; c < Hidden2; c++)
-            {
-                dW3[off + c] += g * a2[c];
-                dA2[c] += g * Weight3[off + c];
-            }
+        dB3[action] += g;
+        int offA = action * Hidden2;
+        for (int c = 0; c < Hidden2; c++) {
+            dW3[offA + c] += g * a2[c];
+            dA2[c] += g * Weight3[offA + c];
         }
 
+        // ReLU'(a2)
         for (int i = 0; i < Hidden2; i++)
-        {
             if (a2[i] <= 0f) dA2[i] = 0f;
-        }
 
         var dW2 = new float[Weight2.Length];
         var dB2 = new float[Bias2.Length];
         var dA1 = new float[Hidden1];
 
-        for (int r = 0; r < Hidden2; r++)
-        {
-            float g = dA2[r];
-            dB2[r] += g;
+        for (int r = 0; r < Hidden2; r++) {
+            float gr = dA2[r];
+            dB2[r] += gr;
             int off = r * Hidden1;
-            for (int c = 0; c < Hidden1; c++)
-            {
-                dW2[off + c] += g * a1[c];
-                dA1[c] += g * Weight2[off + c];
+            for (int c = 0; c < Hidden1; c++) {
+                dW2[off + c] += gr * a1[c];
+                dA1[c] += gr * Weight2[off + c];
             }
         }
 
         for (int i = 0; i < Hidden1; i++)
-        {
             if (a1[i] <= 0f) dA1[i] = 0f;
-        }
 
         var dW1 = new float[Weight1.Length];
         var dB1 = new float[Bias1.Length];
 
-        for (int r = 0; r < Hidden1; r++)
-        {
-            float g = dA1[r];
-            dB1[r] += g;
+        for (int r = 0; r < Hidden1; r++) {
+            float gr = dA1[r];
+            dB1[r] += gr;
             int off = r * InputSize;
             for (int c = 0; c < InputSize; c++)
-            {
-                dW1[off + c] += g * state[c];
-            }
+                dW1[off + c] += gr * state[c];
         }
 
-        for (int i = 0; i < Weight3.Length; i++)
-            Weight3[i] -= learningRate * dW3[i];
-
-        for (int i = 0; i < Bias3.Length; i++)
-            Bias3[i] -= learningRate * dB3[i];
-
-        for (int i = 0; i < Weight2.Length; i++)
-            Weight2[i] -= learningRate * dW2[i];
-
-        for (int i = 0; i < Bias2.Length; i++)
-            Bias2[i] -= learningRate * dB2[i];
-
-        for (int i = 0; i < Weight1.Length; i++)
-            Weight1[i] -= learningRate * dW1[i];
-
-        for (int i = 0; i < Bias1.Length; i++)
-            Bias1[i] -= learningRate * dB1[i];
+        // SGD step
+        for (int i = 0; i < Weight3.Length; i++) Weight3[i] -= learningRate * dW3[i];
+        for (int i = 0; i < Bias3.Length;   i++) Bias3[i]   -= learningRate * dB3[i];
+        for (int i = 0; i < Weight2.Length; i++) Weight2[i] -= learningRate * dW2[i];
+        for (int i = 0; i < Bias2.Length;   i++) Bias2[i]   -= learningRate * dB2[i];
+        for (int i = 0; i < Weight1.Length; i++) Weight1[i] -= learningRate * dW1[i];
+        for (int i = 0; i < Bias1.Length;   i++) Bias1[i]   -= learningRate * dB1[i];
     }
 
-    public void BackwardAndStepBatch(Batch batch, float[] targets, float lr)
+    public void BackwardAndStepBatch(Batch batch, float[] targets, float lr, bool average=true)
     {
+        int B = batch.Actions.Length;
+        if (targets.Length != B) throw new ArgumentException("targets length mismatch");
+
         var dW3 = new float[Weight3.Length]; var dB3 = new float[Bias3.Length];
         var dW2 = new float[Weight2.Length]; var dB2 = new float[Bias2.Length];
         var dW1 = new float[Weight1.Length]; var dB1 = new float[Bias1.Length];
-
-        int B = batch.Actions.Length;
 
         for (int n = 0; n < B; n++)
         {
             var x = batch.States[n];
             int a = batch.Actions[n];
-            float t = targets[n];
+            if (x.Length != InputSize) throw new ArgumentException("state size mismatch");
+            if ((uint)a >= (uint)OutputSize) throw new ArgumentOutOfRangeException(nameof(batch.Actions));
 
+            float t = targets[n];
             Forward(x, out var a1, out var a2, out var q);
 
-            var dQ = new float[OutputSize];
-            dQ[a] = q[a] - t;
-
+            float g = q[a] - t; // dQ[a]
+            dB3[a] += g;
+            int offA = a * Hidden2;
             var dA2 = new float[Hidden2];
-            for (int r = 0; r < OutputSize; r++)
-            {
-                float g = dQ[r];
-                dB3[r] += g;
-                int off = r * Hidden2;
-                for (int c = 0; c < Hidden2; c++)
-                {
-                    dW3[off + c] += g * a2[c];
-                    dA2[c] += g * Weight3[off + c];
-                }
+
+            for (int c = 0; c < Hidden2; c++) {
+                dW3[offA + c] += g * a2[c];
+                dA2[c] += g * Weight3[offA + c];
             }
             for (int i = 0; i < Hidden2; i++) if (a2[i] <= 0f) dA2[i] = 0f;
 
             var dA1 = new float[Hidden1];
-            for (int r = 0; r < Hidden2; r++)
-            {
-                float g = dA2[r];
-                dB2[r] += g;
+            for (int r = 0; r < Hidden2; r++) {
+                float gr = dA2[r];
+                dB2[r] += gr;
                 int off = r * Hidden1;
-                for (int c = 0; c < Hidden1; c++)
-                {
-                    dW2[off + c] += g * a1[c];
-                    dA1[c] += g * Weight2[off + c];
+                for (int c = 0; c < Hidden1; c++) {
+                    dW2[off + c] += gr * a1[c];
+                    dA1[c] += gr * Weight2[off + c];
                 }
             }
             for (int i = 0; i < Hidden1; i++) if (a1[i] <= 0f) dA1[i] = 0f;
 
-            for (int r = 0; r < Hidden1; r++)
-            {
-                float g = dA1[r];
-                dB1[r] += g;
+            for (int r = 0; r < Hidden1; r++) {
+                float gr = dA1[r];
+                dB1[r] += gr;
                 int off = r * InputSize;
                 for (int c = 0; c < InputSize; c++)
-                    dW1[off + c] += g * x[c];
+                    dW1[off + c] += gr * x[c];
             }
         }
 
-        for (int i = 0; i < Weight3.Length; i++) Weight3[i] -= lr * dW3[i];
-        for (int i = 0; i < Bias3.Length; i++) Bias3[i] -= lr * dB3[i];
-
-        for (int i = 0; i < Weight2.Length; i++) Weight2[i] -= lr * dW2[i];
-        for (int i = 0; i < Bias2.Length; i++) Bias2[i] -= lr * dB2[i];
-
-        for (int i = 0; i < Weight1.Length; i++) Weight1[i] -= lr * dW1[i];
-        for (int i = 0; i < Bias1.Length; i++) Bias1[i] -= lr * dB1[i];
+        float scale = average ? 1f / B : 1f;
+        for (int i = 0; i < Weight3.Length; i++) Weight3[i] -= lr * (dW3[i] * scale);
+        for (int i = 0; i < Bias3.Length;   i++) Bias3[i]   -= lr * (dB3[i] * scale);
+        for (int i = 0; i < Weight2.Length; i++) Weight2[i] -= lr * (dW2[i] * scale);
+        for (int i = 0; i < Bias2.Length;   i++) Bias2[i]   -= lr * (dB2[i] * scale);
+        for (int i = 0; i < Weight1.Length; i++) Weight1[i] -= lr * (dW1[i] * scale);
+        for (int i = 0; i < Bias1.Length;   i++) Bias1[i]   -= lr * (dB1[i] * scale);
     }
 
     public void Save(string path)
