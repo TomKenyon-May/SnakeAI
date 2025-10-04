@@ -20,6 +20,19 @@ public static class Program
         var qNet = new Mlp(inputSize, hidden1, hidden2, outputSize);
         var targetNet = new Mlp(inputSize, hidden1, hidden2, outputSize);
 
+        string savePath = "snake_model.mlp";
+        //try load existing model
+        if (File.Exists(savePath))
+        {
+            Console.WriteLine($"Loading existing model from '{savePath}'...");
+            qNet.Load(savePath);
+            targetNet.CopyWeightsFrom(qNet);
+        }
+        else
+        {
+            Console.WriteLine("No existing model found. A new model will be created.");
+        }
+
         // ---- Create trainer ----
         var trainer = new SnakeTraining(agent, qNet, targetNet, outputSize);
 
@@ -34,7 +47,6 @@ public static class Program
         trainer.Run(episodes);
 
         // ---- Save trained model ----
-        string savePath = "snake_model.mlp";
         qNet.Save(savePath);
 
         Console.WriteLine($"\nTraining complete. Model saved to '{savePath}'.");
