@@ -37,7 +37,7 @@ public static class Program
         var trainer = new SnakeTraining(agent, qNet, targetNet, outputSize);
 
         // ---- Training parameters ----
-        int episodes = 1000;
+        int episodes = 20000;
         if (args.Length > 0 && int.TryParse(args[0], out int userEpisodes))
             episodes = userEpisodes;
 
