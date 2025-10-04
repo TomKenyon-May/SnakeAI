@@ -44,37 +44,40 @@ public class SnakeGame
                 break;
             default:
                 SnakeDead = true;
-                break;
+                return;
         }
 
-        CollisionCheck(newSnakeHead);
+        if (OutOfBounds(newSnakeHead))
+        {
+            SnakeDead = true;
+            return;
+        }
 
         if (newSnakeHead.X == Apple.X && newSnakeHead.Y == Apple.Y)
         {
-            Snake.Add(newSnakeHead);
             MoveApple();
         }
         else
         {
             Snake.RemoveAt(0);
-            Snake.Add(newSnakeHead);
         }
+        
+        Snake.Add(newSnakeHead);
     }
 
-    public void CollisionCheck(Point head)
+    public bool OutOfBounds(Point head)
     {
         // check wall collision
         if (head.X < 0 || head.X > 19 || head.Y < 0 || head.Y > 19)
         {
-            SnakeDead = true;
-            return;
+            return true;
         }
 
         // check self collision
         if (Snake.Contains(head))
         {
-            SnakeDead = true;
-            return;
+            return true;
         }
+        return false;
     }
 }
