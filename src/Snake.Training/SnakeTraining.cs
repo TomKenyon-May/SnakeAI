@@ -15,7 +15,7 @@ public sealed class SnakeTraining
 
     private readonly float epsilonStart = 1.0f;
     private readonly float epsilonEnd = 0.05f;
-    private readonly int epsilonDecaySteps = 100_000;
+    private readonly float epsilonDecayRate = 0.999995f;
 
     private readonly int replayCapacity = 50_000;
     private readonly int warmupSteps = 5_000;
@@ -95,14 +95,7 @@ public sealed class SnakeTraining
 
     private void EpsilonAnneal()
     {
-        if (globalStep >= epsilonDecaySteps)
-        {
-            epsilon = epsilonEnd;
-            return;
-        }
-
-        float t = (float)globalStep / epsilonDecaySteps;
-        epsilon = epsilonStart + (epsilonEnd - epsilonStart) * t;
+        epsilon = MathF.Max(epsilonEnd, epsilon * epsilonDecayRate);
     }
 
     // ---- Training step ----
